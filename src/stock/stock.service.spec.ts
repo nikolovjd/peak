@@ -1,7 +1,10 @@
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
-import { FinnhubAuthError } from './providers/finnhub-stock-provider';
+import {
+  FinnhubAuthError,
+  FinnhubInvalidSymbolError,
+} from './providers/finnhub-stock-provider';
 import { STOCK_DATA_PROVIDER } from './providers/stock-data-provider';
 import type { StockDataProvider } from './providers/stock-data-provider';
 import { StockService } from './stock.service';
@@ -108,24 +111,34 @@ describe('StockService', () => {
       expect(result).toEqual({ symbol: 'AAPL' });
     });
 
-    it('still upserts the tracked symbol, then maps an auth failure to ServiceUnavailableException', async () => {
+    it('maps an auth failure to ServiceUnavailableException without tracking the symbol', async () => {
       stockDataProvider.getQuote.mockRejectedValue(new FinnhubAuthError());
 
       await expect(service.startTracking('AAPL')).rejects.toThrow(
         ServiceUnavailableException,
       );
-      expect(prisma.trackedSymbol.upsert).toHaveBeenCalledWith({
-        where: { symbol: 'AAPL' },
-        create: { symbol: 'AAPL' },
-        update: {},
-      });
+      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
+      expect(prisma.stockPrice.create).not.toHaveBeenCalled();
     });
 
-    it('rethrows non-auth errors as-is', async () => {
+    it('maps an invalid symbol to NotFoundException without tracking it', async () => {
+      stockDataProvider.getQuote.mockRejectedValue(
+        new FinnhubInvalidSymbolError('ZZZZINVALID'),
+      );
+
+      await expect(service.startTracking('ZZZZINVALID')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
+      expect(prisma.stockPrice.create).not.toHaveBeenCalled();
+    });
+
+    it('rethrows other errors as-is without tracking the symbol', async () => {
       const error = new Error('boom');
       stockDataProvider.getQuote.mockRejectedValue(error);
 
       await expect(service.startTracking('AAPL')).rejects.toBe(error);
+      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
     });
   });
 

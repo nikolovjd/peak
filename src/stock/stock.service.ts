@@ -9,7 +9,10 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockSummaryDto } from './dto/stock-summary.dto';
 import { TrackSymbolDto } from './dto/track-symbol.dto';
-import { FinnhubAuthError } from './providers/finnhub-stock-provider';
+import {
+  FinnhubAuthError,
+  FinnhubInvalidSymbolError,
+} from './providers/finnhub-stock-provider';
 import { STOCK_DATA_PROVIDER } from './providers/stock-data-provider';
 import type { StockDataProvider } from './providers/stock-data-provider';
 
@@ -51,20 +54,16 @@ export class StockService {
   }
 
   async startTracking(symbol: string): Promise<TrackSymbolDto> {
+    const quote = await this.fetchQuote(symbol);
+
     await this.prisma.trackedSymbol.upsert({
       where: { symbol },
       create: { symbol },
       update: {},
     });
-
-    try {
-      await this.recordPrice(symbol);
-    } catch (error) {
-      if (error instanceof FinnhubAuthError) {
-        throw new ServiceUnavailableException(error.message);
-      }
-      throw error;
-    }
+    await this.prisma.stockPrice.create({
+      data: { symbol, price: quote.price },
+    });
 
     return { symbol };
   }
@@ -98,10 +97,17 @@ export class StockService {
     }
   }
 
-  private async recordPrice(symbol: string): Promise<void> {
-    const quote = await this.stockDataProvider.getQuote(symbol);
-    await this.prisma.stockPrice.create({
-      data: { symbol, price: quote.price },
-    });
+  private async fetchQuote(symbol: string) {
+    try {
+      return await this.stockDataProvider.getQuote(symbol);
+    } catch (error) {
+      if (error instanceof FinnhubAuthError) {
+        throw new ServiceUnavailableException(error.message);
+      }
+      if (error instanceof FinnhubInvalidSymbolError) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
   }
 }

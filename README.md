@@ -8,10 +8,10 @@ Interactive API docs (Swagger) are served at `/docs` once the app is running.
 
 | Method | Path             | Description                                                            |
 | ------ | ---------------- | ------------------------------------------------------------------------ |
-| `PUT`  | `/stock/:symbol` | Start tracking a symbol — upserts it and records an initial price       |
+| `PUT`  | `/stock/:symbol` | Start tracking a symbol — upserts it and records an initial price (`404` if the symbol doesn't exist) |
 | `GET`  | `/stock/:symbol` | Get the latest price, last updated time, and moving average for a symbol (`404` if nothing has been recorded yet) |
 
-If the configured `FINNHUB_API_KEY` is invalid, requests that need a live quote (`PUT`, and the cron poll) fail with `503 Service Unavailable` rather than a generic `500`.
+If the configured `FINNHUB_API_KEY` is invalid, requests that need a live quote (`PUT`, and the cron poll) fail with `503 Service Unavailable` rather than a generic `500`. An unknown stock symbol fails with `404 Not Found` and is never tracked or persisted.
 
 ## Project setup
 

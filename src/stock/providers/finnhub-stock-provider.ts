@@ -10,6 +10,13 @@ export class FinnhubAuthError extends Error {
   }
 }
 
+export class FinnhubInvalidSymbolError extends Error {
+  constructor(symbol: string) {
+    super(`Unknown stock symbol: ${symbol}`);
+    this.name = 'FinnhubInvalidSymbolError';
+  }
+}
+
 @Injectable()
 export class FinnhubStockProvider implements StockDataProvider {
   private readonly client: finnhub.DefaultApi;
@@ -23,6 +30,10 @@ export class FinnhubStockProvider implements StockDataProvider {
       this.client.quote(symbol, (error, data, response) => {
         if (error) {
           reject(this.toError(error, response?.status));
+          return;
+        }
+        if (data.c === 0 && data.pc === 0 && data.t === 0) {
+          reject(new FinnhubInvalidSymbolError(symbol));
           return;
         }
         resolve({
