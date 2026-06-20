@@ -10,3 +10,17 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model TrackedSymbol {
+  symbol    String   @id
+  createdAt DateTime @default(now())
+}
+
+model StockPrice {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  price     Float
+  fetchedAt DateTime @default(now())
+
+  @@index([symbol, fetchedAt])
+}
