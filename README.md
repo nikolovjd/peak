@@ -45,7 +45,9 @@ npm run start:prod
 docker compose up --build
 ```
 
-This starts Postgres and the app together, as defined in [docker-compose.yml](docker-compose.yml).
+This starts Postgres, runs database migrations, and starts the app, as defined in [docker-compose.yml](docker-compose.yml).
+
+Migrations run automatically via a one-off `migrate` service (built from the `builder` stage of the [Dockerfile](Dockerfile), which has the Prisma CLI and schema) that runs before `app` starts — no manual steps needed.
 
 ## Tests
 

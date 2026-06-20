@@ -16,12 +16,24 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      target: builder
+    command: npx prisma migrate deploy
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://peak:peak@postgres:5432/peak?schema=public
+
   app:
     build: .
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://peak:peak@postgres:5432/peak?schema=public
       FINNHUB_API_KEY: ${FINNHUB_API_KEY}
