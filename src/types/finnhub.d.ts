@@ -2,6 +2,7 @@ declare module 'finnhub' {
   export interface FinnhubQuoteResponse {
     c: number;
     pc: number;
+    t: number;
   }
 
   export interface FinnhubApiError {

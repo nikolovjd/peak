@@ -2,6 +2,7 @@ import * as finnhub from 'finnhub';
 import { AppConfigService } from '../../config/config.service';
 import {
   FinnhubAuthError,
+  FinnhubInvalidSymbolError,
   FinnhubStockProvider,
 } from './finnhub-stock-provider';
 
@@ -90,6 +91,24 @@ describe('FinnhubStockProvider', () => {
 
     await expect(provider.getQuote('AAPL')).rejects.toBeInstanceOf(
       FinnhubAuthError,
+    );
+  });
+
+  it('rejects with a FinnhubInvalidSymbolError when finnhub returns an all-zero quote', async () => {
+    quoteMock.mockImplementation(
+      (
+        _symbol: string,
+        callback: (
+          error: null,
+          data: { c: number; pc: number; t: number },
+        ) => void,
+      ) => {
+        callback(null, { c: 0, pc: 0, t: 0 });
+      },
+    );
+
+    await expect(provider.getQuote('ZZZZINVALID')).rejects.toBeInstanceOf(
+      FinnhubInvalidSymbolError,
     );
   });
 
