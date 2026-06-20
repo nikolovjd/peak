@@ -8,4 +8,8 @@ export class AppConfigService {
   get databaseUrl(): string {
     return this.configService.getOrThrow<string>('DATABASE_URL');
   }
+
+  get finnhubApiKey(): string {
+    return this.configService.getOrThrow<string>('FINNHUB_API_KEY');
+  }
 }
