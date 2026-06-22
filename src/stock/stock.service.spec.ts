@@ -19,7 +19,11 @@ describe('StockService', () => {
       create: jest.Mock;
       createMany: jest.Mock;
     };
-    trackedSymbol: { findMany: jest.Mock; upsert: jest.Mock };
+    trackedSymbol: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -31,7 +35,8 @@ describe('StockService', () => {
       },
       trackedSymbol: {
         findMany: jest.fn(),
-        upsert: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
       },
     };
 
@@ -95,7 +100,8 @@ describe('StockService', () => {
   });
 
   describe('startTracking', () => {
-    it('upserts the tracked symbol and records an initial price', async () => {
+    it('tracks the symbol and records an initial price when not already tracked', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue(null);
       stockDataProvider.getQuote.mockResolvedValue({
         symbol: 'AAPL',
         price: 123.45,
@@ -104,29 +110,43 @@ describe('StockService', () => {
 
       const result = await service.startTracking('AAPL');
 
-      expect(prisma.trackedSymbol.upsert).toHaveBeenCalledWith({
+      expect(prisma.trackedSymbol.findUnique).toHaveBeenCalledWith({
         where: { symbol: 'AAPL' },
-        create: { symbol: 'AAPL' },
-        update: {},
       });
       expect(stockDataProvider.getQuote).toHaveBeenCalledWith('AAPL');
+      expect(prisma.trackedSymbol.create).toHaveBeenCalledWith({
+        data: { symbol: 'AAPL' },
+      });
       expect(prisma.stockPrice.create).toHaveBeenCalledWith({
         data: { symbol: 'AAPL', price: 123.45 },
       });
       expect(result).toEqual({ symbol: 'AAPL' });
     });
 
+    it('is idempotent when the symbol is already tracked', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue({ symbol: 'AAPL' });
+
+      const result = await service.startTracking('AAPL');
+
+      expect(stockDataProvider.getQuote).not.toHaveBeenCalled();
+      expect(prisma.trackedSymbol.create).not.toHaveBeenCalled();
+      expect(prisma.stockPrice.create).not.toHaveBeenCalled();
+      expect(result).toEqual({ symbol: 'AAPL' });
+    });
+
     it('maps an auth failure to ServiceUnavailableException without tracking the symbol', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue(null);
       stockDataProvider.getQuote.mockRejectedValue(new FinnhubAuthError());
 
       await expect(service.startTracking('AAPL')).rejects.toThrow(
         ServiceUnavailableException,
       );
-      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
+      expect(prisma.trackedSymbol.create).not.toHaveBeenCalled();
       expect(prisma.stockPrice.create).not.toHaveBeenCalled();
     });
 
     it('maps an invalid symbol to NotFoundException without tracking it', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue(null);
       stockDataProvider.getQuote.mockRejectedValue(
         new FinnhubInvalidSymbolError('ZZZZINVALID'),
       );
@@ -134,16 +154,17 @@ describe('StockService', () => {
       await expect(service.startTracking('ZZZZINVALID')).rejects.toThrow(
         NotFoundException,
       );
-      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
+      expect(prisma.trackedSymbol.create).not.toHaveBeenCalled();
       expect(prisma.stockPrice.create).not.toHaveBeenCalled();
     });
 
     it('rethrows other errors as-is without tracking the symbol', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue(null);
       const error = new Error('boom');
       stockDataProvider.getQuote.mockRejectedValue(error);
 
       await expect(service.startTracking('AAPL')).rejects.toBe(error);
-      expect(prisma.trackedSymbol.upsert).not.toHaveBeenCalled();
+      expect(prisma.trackedSymbol.create).not.toHaveBeenCalled();
     });
   });
 
