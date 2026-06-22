@@ -1,5 +1,6 @@
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { AppConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   FinnhubAuthError,
@@ -44,6 +45,10 @@ describe('StockService', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: AppConfigService,
+          useValue: { movingAverageWindow: 10, quoteFetchBatchSize: 20 },
         },
       ],
     }).compile();

@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { AppConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockSummaryDto } from './dto/stock-summary.dto';
 import { TrackSymbolDto } from './dto/track-symbol.dto';
@@ -16,9 +17,6 @@ import {
 import { STOCK_DATA_PROVIDER } from './providers/stock-data-provider';
 import type { StockDataProvider } from './providers/stock-data-provider';
 
-const MOVING_AVERAGE_WINDOW = 10;
-const QUOTE_FETCH_BATCH_SIZE = 20;
-
 @Injectable()
 export class StockService {
   private readonly logger = new Logger(StockService.name);
@@ -27,13 +25,14 @@ export class StockService {
     @Inject(STOCK_DATA_PROVIDER)
     private readonly stockDataProvider: StockDataProvider,
     private readonly prisma: PrismaService,
+    private readonly configService: AppConfigService,
   ) {}
 
   async getStockSummary(symbol: string): Promise<StockSummaryDto> {
     const recentPrices = await this.prisma.stockPrice.findMany({
       where: { symbol },
       orderBy: { fetchedAt: 'desc' },
-      take: MOVING_AVERAGE_WINDOW,
+      take: this.configService.movingAverageWindow,
     });
 
     const [latest] = recentPrices;
@@ -73,8 +72,15 @@ export class StockService {
     const trackedSymbols = await this.prisma.trackedSymbol.findMany();
     const priceRecords: { symbol: string; price: number }[] = [];
 
-    for (let i = 0; i < trackedSymbols.length; i += QUOTE_FETCH_BATCH_SIZE) {
-      const batch = trackedSymbols.slice(i, i + QUOTE_FETCH_BATCH_SIZE);
+    for (
+      let i = 0;
+      i < trackedSymbols.length;
+      i += this.configService.quoteFetchBatchSize
+    ) {
+      const batch = trackedSymbols.slice(
+        i,
+        i + this.configService.quoteFetchBatchSize,
+      );
       const results = await Promise.allSettled(
         batch.map(({ symbol }) => this.stockDataProvider.getQuote(symbol)),
       );
