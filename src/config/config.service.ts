@@ -12,4 +12,12 @@ export class AppConfigService {
   get finnhubApiKey(): string {
     return this.configService.getOrThrow<string>('FINNHUB_API_KEY');
   }
+
+  get movingAverageWindow(): number {
+    return this.configService.get<number>('MOVING_AVERAGE_WINDOW', 10);
+  }
+
+  get quoteFetchBatchSize(): number {
+    return this.configService.get<number>('QUOTE_FETCH_BATCH_SIZE', 20);
+  }
 }
