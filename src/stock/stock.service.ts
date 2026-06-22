@@ -53,13 +53,16 @@ export class StockService {
   }
 
   async startTracking(symbol: string): Promise<TrackSymbolDto> {
+    const alreadyTracked = await this.prisma.trackedSymbol.findUnique({
+      where: { symbol },
+    });
+    if (alreadyTracked) {
+      return { symbol };
+    }
+
     const quote = await this.fetchQuote(symbol);
 
-    await this.prisma.trackedSymbol.upsert({
-      where: { symbol },
-      create: { symbol },
-      update: {},
-    });
+    await this.prisma.trackedSymbol.create({ data: { symbol } });
     await this.prisma.stockPrice.create({
       data: { symbol, price: quote.price },
     });

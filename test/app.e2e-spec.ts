@@ -14,7 +14,11 @@ describe('Stock (e2e)', () => {
       create: jest.Mock;
       createMany: jest.Mock;
     };
-    trackedSymbol: { findMany: jest.Mock; upsert: jest.Mock };
+    trackedSymbol: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+    };
   };
   let stockDataProvider: { getQuote: jest.Mock };
 
@@ -27,7 +31,8 @@ describe('Stock (e2e)', () => {
       },
       trackedSymbol: {
         findMany: jest.fn(),
-        upsert: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
       },
     };
     stockDataProvider = { getQuote: jest.fn() };
@@ -82,6 +87,7 @@ describe('Stock (e2e)', () => {
 
   describe('PUT /stock/:symbol', () => {
     it('starts tracking a symbol', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue(null);
       stockDataProvider.getQuote.mockResolvedValue({
         symbol: 'AAPL',
         price: 123.45,
@@ -93,11 +99,21 @@ describe('Stock (e2e)', () => {
         .expect(200);
 
       expect(stockDataProvider.getQuote).toHaveBeenCalledWith('AAPL');
-      expect(prisma.trackedSymbol.upsert).toHaveBeenCalledWith({
-        where: { symbol: 'AAPL' },
-        create: { symbol: 'AAPL' },
-        update: {},
+      expect(prisma.trackedSymbol.create).toHaveBeenCalledWith({
+        data: { symbol: 'AAPL' },
       });
+      expect(response.body).toEqual({ symbol: 'AAPL' });
+    });
+
+    it('is idempotent when the symbol is already tracked', async () => {
+      prisma.trackedSymbol.findUnique.mockResolvedValue({ symbol: 'AAPL' });
+
+      const response = await request(app.getHttpServer())
+        .put('/stock/aapl')
+        .expect(200);
+
+      expect(stockDataProvider.getQuote).not.toHaveBeenCalled();
+      expect(prisma.trackedSymbol.create).not.toHaveBeenCalled();
       expect(response.body).toEqual({ symbol: 'AAPL' });
     });
   });
